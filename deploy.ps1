@@ -83,6 +83,21 @@ Invoke-SmartSmokeTest -Url "http://localhost:$resultPort/" `
 Write-Host "All smoke tests passed." -ForegroundColor Green
 Write-Host ""
 # ---- end smoke test ----
+try {
+    Invoke-SmartSmokeTest -Url "http://localhost:$votePort/" `
+        -MustContainAny @("Cats","Dogs","Vote","Voting")
+
+    Invoke-SmartSmokeTest -Url "http://localhost:$resultPort/" `
+        -MustContainAny @("Result","Results","Cats","Dogs")
+
+    Write-Host "All smoke tests passed." -ForegroundColor Green
+}
+catch {
+    Write-Host "Smoke tests failed. Rolling back..." -ForegroundColor Red
+
+    docker compose -f $composeFile down
+    exit 1
+}
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Up failed." -ForegroundColor Red
