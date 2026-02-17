@@ -1,6 +1,10 @@
 pipeline {
     agent any
 
+    environment {
+        DOCKERHUB_REPO = "khanbibi"
+    }
+
     stages {
 
         stage('Checkout') {
@@ -14,35 +18,45 @@ pipeline {
             steps {
                 echo '🔨 Building Docker images...'
                 sh '''
-                    docker build -t voting-app-vote ./vote
-                    docker build -t voting-app-result ./result
-                    docker build -t voting-app-worker ./worker
+                    docker build -t $DOCKERHUB_REPO/voting-app-vote:${BUILD_NUMBER} ./vote
+                    docker build -t $DOCKERHUB_REPO/voting-app-result:${BUILD_NUMBER} ./result
+                    docker build -t $DOCKERHUB_REPO/voting-app-worker:${BUILD_NUMBER} ./worker
+
+                    docker tag $DOCKERHUB_REPO/voting-app-vote:${BUILD_NUMBER} $DOCKERHUB_REPO/voting-app-vote:latest
+                    docker tag $DOCKERHUB_REPO/voting-app-result:${BUILD_NUMBER} $DOCKERHUB_REPO/voting-app-result:latest
+                    docker tag $DOCKERHUB_REPO/voting-app-worker:${BUILD_NUMBER} $DOCKERHUB_REPO/voting-app-worker:latest
                 '''
             }
         }
 
-        stage('Unit Tests') {
+        stage('Push to Docker Hub') {
             steps {
-                echo '🧪 Running tests (placeholder)...'
-                sh '''
-                    echo "No unit tests configured yet"
-                '''
-            }
-        }
+                echo '🚀 Pushing images to Docker Hub...'
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-creds',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh '''
+                        echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
 
-        stage('Package') {
-            steps {
-                echo '📦 Verifying built images...'
-                sh '''
-                    docker images | grep voting-app
-                '''
+                        docker push $DOCKERHUB_REPO/voting-app-vote:${BUILD_NUMBER}
+                        docker push $DOCKERHUB_REPO/voting-app-vote:latest
+
+                        docker push $DOCKERHUB_REPO/voting-app-result:${BUILD_NUMBER}
+                        docker push $DOCKERHUB_REPO/voting-app-result:latest
+
+                        docker push $DOCKERHUB_REPO/voting-app-worker:${BUILD_NUMBER}
+                        docker push $DOCKERHUB_REPO/voting-app-worker:latest
+                    '''
+                }
             }
         }
     }
 
     post {
         success {
-            echo '✅ Task #13 Complete!'
+            echo '✅ Task #15 Complete! Images pushed to Docker Hub!'
         }
         failure {
             echo '❌ Build failed!'
