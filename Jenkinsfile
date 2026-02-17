@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_TAG = "${BUILD_NUMBER}"
+        IMAGE_TAG = ''
     }
 
     stages {
@@ -10,44 +10,59 @@ pipeline {
         stage('Checkout') {
             steps {
                 checkout scm
+                script {
+                    IMAGE_TAG = sh(
+                        script: "git rev-parse --short HEAD",
+                        returnStdout: true
+                    ).trim()
+                }
             }
         }
 
-        stage('Build') {
-            steps {
-                sh """
-                    docker build -t voting-app-vote:${IMAGE_TAG} ./vote
-                    docker build -t voting-app-result:${IMAGE_TAG} ./result
-                    docker build -t voting-app-worker:${IMAGE_TAG} ./worker
-                """
+        stage('Build (Parallel)') {
+            parallel {
+
+                stage('Vote') {
+                    steps {
+                        sh "docker build -t voting-app-vote:${IMAGE_TAG} ./vote"
+                    }
+                }
+
+                stage('Result') {
+                    steps {
+                        sh "docker build -t voting-app-result:${IMAGE_TAG} ./result"
+                    }
+                }
+
+                stage('Worker') {
+                    steps {
+                        sh "docker build -t voting-app-worker:${IMAGE_TAG} ./worker"
+                    }
+                }
             }
         }
 
         stage('Test') {
             steps {
-                sh 'echo Running tests... > test-report.txt'
-                sh 'echo All tests passed >> test-report.txt'
-                sh 'ls -la'
+                sh '''
+                    echo "Running tests..." > test-report.txt
+                    echo "All tests passed" >> test-report.txt
+                '''
             }
         }
 
-        stage('Package') {
-            steps {
-                sh """
-                    docker tag voting-app-vote:${IMAGE_TAG} voting-app-vote:latest
-                    docker tag voting-app-result:${IMAGE_TAG} voting-app-result:latest
-                    docker tag voting-app-worker:${IMAGE_TAG} voting-app-worker:latest
-                """
+        stage('Push Images (main only)') {
+            when {
+                branch 'main'
             }
-        }
 
-        stage('Push Images') {
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: 'dockerhub-creds',
                     usernameVariable: 'DOCKER_USER',
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
+
                     sh """
                         echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
 
@@ -55,17 +70,9 @@ pipeline {
                         docker tag voting-app-result:${IMAGE_TAG} ${DOCKER_USER}/voting-app-result:${IMAGE_TAG}
                         docker tag voting-app-worker:${IMAGE_TAG} ${DOCKER_USER}/voting-app-worker:${IMAGE_TAG}
 
-                        docker tag voting-app-vote:${IMAGE_TAG} ${DOCKER_USER}/voting-app-vote:latest
-                        docker tag voting-app-result:${IMAGE_TAG} ${DOCKER_USER}/voting-app-result:latest
-                        docker tag voting-app-worker:${IMAGE_TAG} ${DOCKER_USER}/voting-app-worker:latest
-
                         docker push ${DOCKER_USER}/voting-app-vote:${IMAGE_TAG}
                         docker push ${DOCKER_USER}/voting-app-result:${IMAGE_TAG}
                         docker push ${DOCKER_USER}/voting-app-worker:${IMAGE_TAG}
-
-                        docker push ${DOCKER_USER}/voting-app-vote:latest
-                        docker push ${DOCKER_USER}/voting-app-result:latest
-                        docker push ${DOCKER_USER}/voting-app-worker:latest
                     """
                 }
             }
@@ -77,10 +84,10 @@ pipeline {
             archiveArtifacts artifacts: 'test-report.txt', allowEmptyArchive: false
         }
         success {
-            echo "Pipeline completed successfully"
+            echo "CI Pipeline completed successfully"
         }
         failure {
-            echo "Pipeline failed"
+            echo "CI Pipeline failed"
         }
     }
 }
