@@ -2,6 +2,7 @@ pipeline {
     agent any
 
     environment {
+        DOCKERHUB_REPO = "khanbibi"
         IMAGE_TAG = ''
     }
 
@@ -24,37 +25,63 @@ pipeline {
 
                 stage('Vote') {
                     steps {
-                        sh "docker build -t voting-app-vote:${IMAGE_TAG} ./vote"
+                        sh """
+                            docker build -t $DOCKERHUB_REPO/voting-app-vote:${IMAGE_TAG} ./vote
+                            docker tag $DOCKERHUB_REPO/voting-app-vote:${IMAGE_TAG} $DOCKERHUB_REPO/voting-app-vote:latest
+                        """
                     }
                 }
 
                 stage('Result') {
                     steps {
-                        sh "docker build -t voting-app-result:${IMAGE_TAG} ./result"
+                        sh """
+                            docker build -t $DOCKERHUB_REPO/voting-app-result:${IMAGE_TAG} ./result
+                            docker tag $DOCKERHUB_REPO/voting-app-result:${IMAGE_TAG} $DOCKERHUB_REPO/voting-app-result:latest
+                        """
                     }
                 }
 
                 stage('Worker') {
                     steps {
-                        sh "docker build -t voting-app-worker:${IMAGE_TAG} ./worker"
+                        sh """
+                            docker build -t $DOCKERHUB_REPO/voting-app-worker:${IMAGE_TAG} ./worker
+                            docker tag $DOCKERHUB_REPO/voting-app-worker:${IMAGE_TAG} $DOCKERHUB_REPO/voting-app-worker:latest
+                        """
                     }
                 }
             }
         }
 
-        stage('Test') {
+        stage('Push to Docker Hub') {
             steps {
-                sh '''
-                    echo "Running tests..." > test-report.txt
-                    echo "All tests passed" >> test-report.txt
-                '''
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-creds',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh """
+                        echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+
+                        docker push $DOCKERHUB_REPO/voting-app-vote:${IMAGE_TAG}
+                        docker push $DOCKERHUB_REPO/voting-app-vote:latest
+
+                        docker push $DOCKERHUB_REPO/voting-app-result:${IMAGE_TAG}
+                        docker push $DOCKERHUB_REPO/voting-app-result:latest
+
+                        docker push $DOCKERHUB_REPO/voting-app-worker:${IMAGE_TAG}
+                        docker push $DOCKERHUB_REPO/voting-app-worker:latest
+                    """
+                }
             }
         }
     }
 
     post {
-        always {
-            archiveArtifacts artifacts: 'test-report.txt', allowEmptyArchive: false
+        success {
+            echo '✅ Build successful! Images pushed to Docker Hub.'
+        }
+        failure {
+            echo '❌ Build failed!'
         }
     }
 }
