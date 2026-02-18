@@ -50,44 +50,11 @@ pipeline {
                 '''
             }
         }
-
-        stage('Push Images (main only)') {
-            when {
-                branch 'main'
-            }
-
-            steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'dockerhub-creds',
-                    usernameVariable: 'DOCKER_USER',
-                    passwordVariable: 'DOCKER_PASS'
-                )]) {
-
-                    sh """
-                        echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
-
-                        docker tag voting-app-vote:${IMAGE_TAG} ${DOCKER_USER}/voting-app-vote:${IMAGE_TAG}
-                        docker tag voting-app-result:${IMAGE_TAG} ${DOCKER_USER}/voting-app-result:${IMAGE_TAG}
-                        docker tag voting-app-worker:${IMAGE_TAG} ${DOCKER_USER}/voting-app-worker:${IMAGE_TAG}
-
-                        docker push ${DOCKER_USER}/voting-app-vote:${IMAGE_TAG}
-                        docker push ${DOCKER_USER}/voting-app-result:${IMAGE_TAG}
-                        docker push ${DOCKER_USER}/voting-app-worker:${IMAGE_TAG}
-                    """
-                }
-            }
-        }
     }
 
     post {
         always {
             archiveArtifacts artifacts: 'test-report.txt', allowEmptyArchive: false
-        }
-        success {
-            echo "CI Pipeline completed successfully"
-        }
-        failure {
-            echo "CI Pipeline failed"
         }
     }
 }
