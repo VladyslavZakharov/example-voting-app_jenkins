@@ -1,6 +1,14 @@
 pipeline {
     agent any
 
+    parameters {
+        choice(
+            name: 'ENVIRONMENT',
+            choices: ['dev', 'staging', 'prod'],
+            description: 'Select deployment environment'
+        )
+    }
+
     environment {
         DOCKERHUB_REPO = "khanbibi"
         IMAGE_TAG = ''
@@ -74,14 +82,29 @@ pipeline {
                 }
             }
         }
+
+        stage('Manual Approval (Prod Only)') {
+            when {
+                expression { params.ENVIRONMENT == 'prod' }
+            }
+            steps {
+                input message: "Deploy to PRODUCTION?"
+            }
+        }
+
+        stage('Show Environment') {
+            steps {
+                echo "Selected environment: ${params.ENVIRONMENT}"
+            }
+        }
     }
 
     post {
         success {
-            echo '✅ Build successful! Images pushed to Docker Hub.'
+            echo "✅ Build successful for ${params.ENVIRONMENT}!"
         }
         failure {
-            echo '❌ Build failed!'
+            echo "❌ Build failed!"
         }
     }
 }
