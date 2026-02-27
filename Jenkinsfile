@@ -61,9 +61,8 @@ pipeline {
                     echo "Waiting for container to start..."
                     sleep 10
 
-                    echo "Running tests..."
-                    chmod +x ./result/tests/tests.sh
-                    ./result/tests/tests.sh || true
+                    echo "Testing container via localhost..."
+                    curl -f http://localhost:5000
 
                     echo "Stopping container..."
                     docker stop vote-test || true
