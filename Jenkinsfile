@@ -27,78 +27,73 @@ pipeline {
 
                 stage('Vote') {
                     steps {
-                        sh '''
+                        sh """
                             docker build -t $DOCKERHUB_REPO/voting-app-vote:latest ./vote
                             docker tag $DOCKERHUB_REPO/voting-app-vote:latest $DOCKERHUB_REPO/voting-app-vote:$IMAGE_TAG
-                        '''
+                        """
                     }
                 }
 
                 stage('Result') {
                     steps {
-                        sh '''
+                        sh """
                             docker build -t $DOCKERHUB_REPO/voting-app-result:latest ./result
                             docker tag $DOCKERHUB_REPO/voting-app-result:latest $DOCKERHUB_REPO/voting-app-result:$IMAGE_TAG
-                        '''
+                        """
                     }
                 }
 
                 stage('Worker') {
                     steps {
-                        sh '''
+                        sh """
                             docker build -t $DOCKERHUB_REPO/voting-app-worker:latest ./worker
                             docker tag $DOCKERHUB_REPO/voting-app-worker:latest $DOCKERHUB_REPO/voting-app-worker:$IMAGE_TAG
-                        '''
+                        """
                     }
                 }
             }
         }
 
-        stage('Unit Tests (Container Health Check)') {
+        stage('Unit Tests (Health Check)') {
             steps {
-                sh '''
-                    echo "Starting vote container for tests..."
-
+                sh """
                     docker rm -f vote-test || true
                     docker run -d --name vote-test -p 5000:80 $DOCKERHUB_REPO/voting-app-vote:latest
 
-                    echo "Waiting for container to become healthy..."
+                    sleep 5
 
-                    for i in {1..10}; do
-                        if docker exec vote-test curl -f http://localhost:80; then
-                            echo "Container is healthy!"
-                            break
-                        fi
-                        echo "Retrying in 3 seconds..."
-                        sleep 3
-                    done
+                    if ! docker exec vote-test curl -f http://localhost:80; then
+                        echo "Health check failed!"
+                        docker stop vote-test || true
+                        docker rm vote-test || true
+                        exit 1
+                    fi
 
-                    echo "Stopping container..."
                     docker stop vote-test || true
                     docker rm vote-test || true
-                '''
+                """
             }
         }
 
         stage('Static Code Checks') {
             steps {
-                sh '''
+                sh """
                     chmod +x ./run-static-checks.sh
                     ./run-static-checks.sh || true
-                '''
+                """
             }
         }
 
         stage('Security Scan (Trivy)') {
             steps {
-                sh '''
+                sh """
                     docker run --rm \
                       -v /var/run/docker.sock:/var/run/docker.sock \
                       aquasec/trivy image \
                       --severity HIGH,CRITICAL \
                       --format table \
                       $DOCKERHUB_REPO/voting-app-vote:latest || true
-                '''
+                """
             }
         }
 
@@ -109,7 +104,7 @@ pipeline {
                     usernameVariable: 'DOCKER_USER',
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
-                    sh '''
+                    sh """
                         echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
 
                         docker push $DOCKERHUB_REPO/voting-app-vote:latest
@@ -120,7 +115,7 @@ pipeline {
 
                         docker push $DOCKERHUB_REPO/voting-app-worker:latest
                         docker push $DOCKERHUB_REPO/voting-app-worker:$IMAGE_TAG
-                    '''
+                    """
                 }
             }
         }
@@ -130,7 +125,30 @@ pipeline {
                 expression { params.ENVIRONMENT == 'prod' }
             }
             steps {
-                input message: "Deploy to PRODUCTION?"
+                input message: "Approve deployment to PRODUCTION?"
+            }
+        }
+
+        stage('Release Tag') {
+            when {
+                branch 'main'
+            }
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'github-creds',
+                    usernameVariable: 'GIT_USER',
+                    passwordVariable: 'GIT_TOKEN'
+                )]) {
+                    sh """
+                        git config user.email "jenkins@example.com"
+                        git config user.name "jenkins"
+
+                        git remote set-url origin https://${GIT_USER}:${GIT_TOKEN}@github.com/VladyslavZakharov/example-voting-app_jenkins.git
+
+                        git tag -a v${BUILD_NUMBER} -m "Release v${BUILD_NUMBER}"
+                        git push origin v${BUILD_NUMBER}
+                    """
+                }
             }
         }
 
@@ -143,11 +161,10 @@ pipeline {
 
     post {
         success {
-            echo "✅ Build successful"
+            echo "Build successful"
         }
-
         failure {
-            echo "❌ Build failed"
+            echo "Build failed"
         }
     }
 }
