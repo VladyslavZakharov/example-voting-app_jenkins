@@ -20,10 +20,7 @@ pipeline {
             steps {
                 checkout scm
                 script {
-                    env.IMAGE_TAG = sh(
-                        script: "git rev-parse --short HEAD",
-                        returnStdout: true
-                    ).trim()
+                    env.IMAGE_TAG = "${BUILD_NUMBER}"
                 }
             }
         }
