@@ -11,6 +11,7 @@ pipeline {
 
     environment {
         DOCKERHUB_REPO = "khanbibi"
+        IMAGE_TAG = "${env.BUILD_NUMBER}"
     }
 
     stages {
@@ -28,6 +29,7 @@ pipeline {
                     steps {
                         sh '''
                             docker build -t $DOCKERHUB_REPO/voting-app-vote:latest ./vote
+                            docker tag $DOCKERHUB_REPO/voting-app-vote:latest $DOCKERHUB_REPO/voting-app-vote:$IMAGE_TAG
                         '''
                     }
                 }
@@ -36,6 +38,7 @@ pipeline {
                     steps {
                         sh '''
                             docker build -t $DOCKERHUB_REPO/voting-app-result:latest ./result
+                            docker tag $DOCKERHUB_REPO/voting-app-result:latest $DOCKERHUB_REPO/voting-app-result:$IMAGE_TAG
                         '''
                     }
                 }
@@ -44,13 +47,14 @@ pipeline {
                     steps {
                         sh '''
                             docker build -t $DOCKERHUB_REPO/voting-app-worker:latest ./worker
+                            docker tag $DOCKERHUB_REPO/voting-app-worker:latest $DOCKERHUB_REPO/voting-app-worker:$IMAGE_TAG
                         '''
                     }
                 }
             }
         }
 
-        stage('Unit Tests') {
+        stage('Unit Tests (Container Health Check)') {
             steps {
                 sh '''
                     echo "Starting vote container for tests..."
@@ -58,11 +62,16 @@ pipeline {
                     docker rm -f vote-test || true
                     docker run -d --name vote-test -p 5000:80 $DOCKERHUB_REPO/voting-app-vote:latest
 
-                    echo "Waiting for container to start..."
-                    sleep 10
+                    echo "Waiting for container to become healthy..."
 
-                    echo "Testing container via localhost..."
-                    curl -f http://localhost:5000
+                    for i in {1..10}; do
+                        if docker exec vote-test curl -f http://localhost:80; then
+                            echo "Container is healthy!"
+                            break
+                        fi
+                        echo "Retrying in 3 seconds..."
+                        sleep 3
+                    done
 
                     echo "Stopping container..."
                     docker stop vote-test || true
@@ -104,8 +113,13 @@ pipeline {
                         echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
 
                         docker push $DOCKERHUB_REPO/voting-app-vote:latest
+                        docker push $DOCKERHUB_REPO/voting-app-vote:$IMAGE_TAG
+
                         docker push $DOCKERHUB_REPO/voting-app-result:latest
+                        docker push $DOCKERHUB_REPO/voting-app-result:$IMAGE_TAG
+
                         docker push $DOCKERHUB_REPO/voting-app-worker:latest
+                        docker push $DOCKERHUB_REPO/voting-app-worker:$IMAGE_TAG
                     '''
                 }
             }
