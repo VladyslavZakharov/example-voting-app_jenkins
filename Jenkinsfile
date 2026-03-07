@@ -27,27 +27,13 @@ pipeline {
             }
         }
 
-        stage('Build (Parallel)') {
-            parallel {
-
-                stage('Vote') {
-                    steps {
-                        sh "docker build -t voting-app-vote:${IMAGE_TAG} ./vote"
-                    }
-                }
-
-                stage('Result') {
-                    steps {
-                        sh "docker build -t voting-app-result:${IMAGE_TAG} ./result"
-                    }
-                }
-
-                stage('Worker') {
-                    steps {
-                        sh "docker build -t voting-app-worker:${IMAGE_TAG} ./worker"
-                    }
-                }
-
+        stage('Build') {
+            steps {
+                sh '''
+                docker build -t voting-app-vote:${IMAGE_TAG} ./vote
+                docker build -t voting-app-result:${IMAGE_TAG} ./result
+                docker build -t voting-app-worker:${IMAGE_TAG} ./worker
+                '''
             }
         }
 
