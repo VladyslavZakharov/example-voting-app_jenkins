@@ -1,18 +1,6 @@
 pipeline {
     agent any
 
-    parameters {
-        choice(
-            name: 'ENVIRONMENT',
-            choices: ['dev', 'staging', 'prod'],
-            description: 'Target deployment environment'
-        )
-    }
-
-    environment {
-        IMAGE_TAG = ''
-    }
-
     stages {
 
         stage('Checkout') {
@@ -27,22 +15,35 @@ pipeline {
             }
         }
 
-        stage('Build') {
-            steps {
-                echo 'Building Docker images'
-                sh '''
-  docker build -t voting-app-vote:latest ./vote
-  docker build -t voting-app-result:latest ./result
-  docker build -t voting-app-worker:latest ./worker
-'''
+        stage('Build (Parallel)') {
+            parallel {
+
+                stage('Vote') {
+                    steps {
+                        sh "docker build -t voting-app-vote:${IMAGE_TAG} ./vote"
+                    }
+                }
+
+                stage('Result') {
+                    steps {
+                        sh "docker build -t voting-app-result:${IMAGE_TAG} ./result"
+                    }
+                }
+
+                stage('Worker') {
+                    steps {
+                        sh "docker build -t voting-app-worker:${IMAGE_TAG} ./worker"
+                    }
+                }
+
             }
         }
 
         stage('Static Checks') {
             steps {
                 sh '''
-                  chmod +x ./run-static-checks.sh
-                  ./run-static-checks.sh || true
+                    chmod +x ./run-static-checks.sh
+                    ./run-static-checks.sh || true
                 '''
             }
         }
@@ -50,11 +51,12 @@ pipeline {
         stage('Security Scan') {
             steps {
                 sh '''
-                  mkdir -p reports
-                  docker run --rm \
-                    -v /var/run/docker.sock:/var/run/docker.sock \
-                    -v $(pwd)/reports:/reports \
-                    aquasec/trivy image voting-app-vote:${IMAGE_TAG} || true
+                    mkdir -p reports
+
+                    docker run --rm \
+                      -v /var/run/docker.sock:/var/run/docker.sock \
+                      -v $(pwd)/reports:/reports \
+                      aquasec/trivy image voting-app-vote:${IMAGE_TAG} || true
                 '''
             }
         }
@@ -62,20 +64,23 @@ pipeline {
         stage('Tests') {
             steps {
                 sh '''
-                  echo "Running tests"
-                  echo "Tests passed" > test-report.txt
+                    echo "Running tests"
+                    echo "Tests passed" > test-report.txt
                 '''
             }
         }
     }
 
     post {
+
         always {
             archiveArtifacts artifacts: '**/*.txt', allowEmptyArchive: true
         }
+
         success {
             echo 'BUILD SUCCESS'
         }
+
         failure {
             echo 'BUILD FAILED'
         }
