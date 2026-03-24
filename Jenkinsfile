@@ -89,10 +89,18 @@ pipeline {
                 sh """
                     docker run --rm \
                       -v /var/run/docker.sock:/var/run/docker.sock \
-                      aquasec/trivy image \
-                      --severity HIGH,CRITICAL \
-                      --format table \
+                      aquasec/trivy image --severity HIGH,CRITICAL --format table \
                       $DOCKERHUB_REPO/voting-app-vote:latest || true
+
+                    docker run --rm \
+                      -v /var/run/docker.sock:/var/run/docker.sock \
+                      aquasec/trivy image --severity HIGH,CRITICAL --format table \
+                      $DOCKERHUB_REPO/voting-app-result:latest || true
+
+                    docker run --rm \
+                      -v /var/run/docker.sock:/var/run/docker.sock \
+                      aquasec/trivy image --severity HIGH,CRITICAL --format table \
+                      $DOCKERHUB_REPO/voting-app-worker:latest || true
                 """
             }
         }
