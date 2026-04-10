@@ -209,19 +209,6 @@ pipeline {
             }
         }
 
-        post {
-            failure {
-                sshagent(['ec2-ssh']) {
-                    sh '''
-                        ssh -o StrictHostKeyChecking=no ubuntu@98.89.185.95 "
-                            /opt/voting/scripts/switch_to_${ACTIVE_COLOR}.sh || true
-                        "
-                    '''
-                }
-                echo "Build failed"
-            }
-        }
-
         stage('Manual Approval (Prod Only)') {
             when {
                 expression { params.ENVIRONMENT == 'prod' }
@@ -260,6 +247,19 @@ pipeline {
             }
         }
     }
+
+    post {
+            failure {
+                sshagent(['ec2-ssh']) {
+                    sh '''
+                        ssh -o StrictHostKeyChecking=no ubuntu@98.89.185.95 "
+                            /opt/voting/scripts/switch_to_${ACTIVE_COLOR}.sh || true
+                        "
+                    '''
+                }
+                echo "Build failed"
+            }
+        }
 
     post {
         success {
