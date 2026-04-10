@@ -8,7 +8,7 @@ docker run --rm -v "$(pwd)/vote:/app" -w /app python:3.11-slim bash -lc "pip ins
 
 # Node.js static check (result)
 echo "Running eslint for result service..."
-docker run --rm -v "$(pwd)/result:/app" -w /app node:20 bash -lc "npm install --no-save eslint && node ./node_modules/eslint/bin/eslint.js -c eslint.config.mjs server.js"
+docker run --rm -v "$(pwd)/result:/app" -w /app node:20 bash -lc "npm install --no-save eslint && find . -type f -name '*.js' ! -path './node_modules/*' -print0 | xargs -0 -r node ./node_modules/eslint/bin/eslint.js -c eslint.config.mjs"
 
 # .NET static check (worker)
 echo "Running dotnet format for worker service..."
