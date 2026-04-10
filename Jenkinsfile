@@ -249,23 +249,18 @@ pipeline {
     }
 
     post {
-            failure {
-                sshagent(['ec2-ssh']) {
-                    sh '''
-                        ssh -o StrictHostKeyChecking=no ubuntu@98.89.185.95 "
-                            /opt/voting/scripts/switch_to_${ACTIVE_COLOR}.sh || true
-                        "
-                    '''
-                }
-                echo "Build failed"
-            }
-        }
-
-    post {
         success {
             echo "Build successful"
         }
+
         failure {
+            sshagent(['ec2-ssh']) {
+                sh """
+                    ssh -o StrictHostKeyChecking=no ubuntu@98.89.185.95 '
+                        /opt/voting/scripts/switch_to_${ACTIVE_COLOR}.sh || true
+                    '
+                """
+            }
             echo "Build failed"
         }
     }
