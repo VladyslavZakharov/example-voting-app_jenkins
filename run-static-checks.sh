@@ -12,6 +12,6 @@ docker run --rm -v "$(pwd)/result:/app" -w /app node:20 bash -lc "npm install --
 
 # .NET static check (worker)
 echo "Running dotnet format for worker service..."
-docker run --rm -v "$(pwd)/worker:/src" -w /src mcr.microsoft.com/dotnet/sdk:8.0 dotnet format --verify-no-changes --severity error
+docker run --rm -v "$(pwd)/worker:/src" -w /src mcr.microsoft.com/dotnet/sdk:8.0 dotnet format Worker.csproj --verify-no-changes --severity error
 
 echo "All static checks completed."
