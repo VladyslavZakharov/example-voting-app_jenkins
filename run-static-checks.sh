@@ -18,12 +18,12 @@ tar -C result -cf - . | docker run --rm -i node:20 bash -lc '
   tar -xf - -C /app &&
   cd /app &&
   npm install --no-save eslint &&
-  node ./node_modules/eslint/bin/eslint.js -c eslint.config.mjs server.js
+  find . -type f -name "*.js" ! -path "./node_modules/*" -print0 | xargs -0 -r node ./node_modules/eslint/bin/eslint.js -c eslint.config.mjs
 '
 
 # .NET static check (worker)
 echo "Running dotnet format for worker service..."
-tar -C worker -cf - . | docker run --rm -i mcr.microsoft.com/dotnet/sdk:8.0 bash -lc '
+tar -C worker -cf - . | docker run --rm -i mcr.microsoft.com/dotnet/sdk:7.0 bash -lc '
   mkdir -p /src &&
   tar -xf - -C /src &&
   cd /src &&
